@@ -146,33 +146,43 @@ func GetTasksOnSpecificPeriodOfTime(c *fiber.Ctx, db *gorm.DB) error {
 		now := time.Now()
 		todayMidnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 		fmt.Println(todayMidnight)
+		// query for view
+		query := db.Model(&data.Task{}).Where("deadline = ?", todayMidnight)
+		//create view
+		db.Migrator().CreateView("today_table", gorm.ViewOption{
+			Query: query,
+			Replace: true,
+		})
+		//select from view
 		db.Raw(`
-			(SELECT * FROM tasks WHERE owner = ? AND deadline = ?)
-			UNION ALL
-			(SELECT * FROM tasks WHERE privacy = 'Public' and deadline = ?)
-		`, username, todayMidnight, todayMidnight).Scan(&tasks)
+			select * from today_table
+			where owner = ? or privacy = 'Public';
+		`, username).Scan(&tasks)
+
+		db.Migrator().DropView("today_table")
+
 		return c.JSON(tasks)
 	case "week":
 		username := claims["username"].(string)
 		var tasks []data.Task
 		now := time.Now()
-		weekEnd := now.AddDate(0, 0, 6)
+		weekEnd := now.AddDate(0, 0, 7)
+		//drop view if exist
+		db.Exec(`
+			drop view week_table;
+		`)
+		//create view
+		db.Exec(`
+			create view week_table as
+			select * from tasks
+			where deadline between ? and ?;
+		`, now, weekEnd)
+
+		//select from view
 		db.Raw(`
-			(SELECT * FROM tasks WHERE owner = ? AND deadline BETWEEN ? AND ?)
-			UNION ALL
-			(SELECT * FROM tasks WHERE privacy = 'Public' and deadline BETWEEN ? AND ?)
-		`, username, now, weekEnd, now, weekEnd).Scan(&tasks)
-		return c.JSON(tasks)
-	case "month":
-		username := claims["username"].(string)
-		var tasks []data.Task
-		now := time.Now()
-		monthEnd := now.AddDate(0, 1, 0)
-		db.Raw(`
-			(SELECT * FROM tasks WHERE owner = ? AND deadline BETWEEN ? AND ?)
-			UNION ALL
-			(SELECT * FROM tasks WHERE privacy = 'Public' and deadline BETWEEN ? AND ?)
-		`, username, now, monthEnd, now, monthEnd).Scan(&tasks)
+			select * from week_table
+			where owner = ? or privacy = 'Public';
+		`, username).Scan(&tasks)
 		return c.JSON(tasks)
 	default:
 		return c.Status(400).JSON(fiber.Map{
