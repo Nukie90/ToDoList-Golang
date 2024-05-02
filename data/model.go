@@ -20,13 +20,13 @@ type Task struct {
 	Title    string `gorm:"type:varchar(50);not null" json:"title"`
 	Desc     string `gorm:"type:varchar(100);not null" json:"desc"`
 	Status   string `gorm:"type:varchar(32);not null" json:"status"`
-	Deadline time.Time `gorm:"type:date;not null" json:"deadline"`
+	Deadline string `gorm:"type:date;not null" json:"deadline"`
 	Privacy  string `gorm:"type:varchar(32);not null" json:"privacy"`
-	Owner   string `gorm:"type:varchar(100);not null" json:"owner"`
+	Owner    string `gorm:"type:varchar(100);not null" json:"owner"`
 }
 
 type User struct {
-	Model 
+	Model
 	Username string `gorm:"type:varchar(100);not null" json:"username"`
 	Password string `gorm:"type:varchar(100);not null" json:"password"`
 }
