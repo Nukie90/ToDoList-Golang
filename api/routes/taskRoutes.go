@@ -23,7 +23,7 @@ func TaskRoutes(app *fiber.App, db *gorm.DB) {
     })
 
 	//get current user tasks
-	task.Get("/seetasks", func(c *fiber.Ctx) error {
+	task.Get("/allseetasks", func(c *fiber.Ctx) error {
 		return handler.GetTasksOnSpecificUser(c, db)
 	})
 

@@ -149,10 +149,15 @@ func GetTasksOnSpecificPeriodOfTime(c *fiber.Ctx, db *gorm.DB) error {
 		// query for view
 		query := db.Model(&data.Task{}).Where("deadline = ?", todayMidnight)
 		//create view
-		db.Migrator().CreateView("today_table", gorm.ViewOption{
+		err := db.Migrator().CreateView("today_table", gorm.ViewOption{
 			Query: query,
 			Replace: true,
 		})
+		if err != nil {
+			return c.Status(400).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		}
 		//select from view
 		db.Raw(`
 			select * from today_table
@@ -166,23 +171,54 @@ func GetTasksOnSpecificPeriodOfTime(c *fiber.Ctx, db *gorm.DB) error {
 		username := claims["username"].(string)
 		var tasks []data.Task
 		now := time.Now()
-		weekEnd := now.AddDate(0, 0, 7)
-		//drop view if exist
-		db.Exec(`
-			drop view week_table;
-		`)
+		weekEnd := now.AddDate(0, 0, 6)
+		// query for view
+		query := db.Model(&data.Task{}).Where("deadline between ? and ?", now, weekEnd)
 		//create view
-		db.Exec(`
-			create view week_table as
-			select * from tasks
-			where deadline between ? and ?;
-		`, now, weekEnd)
-
+		err := db.Migrator().CreateView("week_table", gorm.ViewOption{
+			Query: query,
+			Replace: true,
+		})
+		if err != nil {
+			return c.Status(400).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		}
 		//select from view
 		db.Raw(`
 			select * from week_table
 			where owner = ? or privacy = 'Public';
 		`, username).Scan(&tasks)
+
+		db.Migrator().DropView("week_table")
+
+		return c.JSON(tasks)
+
+	case "month":
+		username := claims["username"].(string)
+		var tasks []data.Task
+		now := time.Now()
+		monthEnd := now.AddDate(0, 1, -1)
+		// query for view
+		query := db.Model(&data.Task{}).Where("deadline between ? and ?", now, monthEnd)
+		//create view
+		err := db.Migrator().CreateView("month_table", gorm.ViewOption{
+			Query: query,
+			Replace: true,
+		})
+		if err != nil {
+			return c.Status(400).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		}
+		//select from view
+		db.Raw(`
+			select * from month_table
+			where owner = ? or privacy = 'Public';
+		`, username).Scan(&tasks)
+
+		db.Migrator().DropView("month_table")
+
 		return c.JSON(tasks)
 	default:
 		return c.Status(400).JSON(fiber.Map{
